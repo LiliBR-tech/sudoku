@@ -1,0 +1,74 @@
+name: Java YML
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # ✅ AGORA ESTÁ CERTO!
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # Checkout do repositório
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Debug: Listar todos os arquivos antes da compilação
+      - name: Debug source files
+        run: ls -R
+
+      # Configurar JDK 11
+      - name: Set up JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+
+      # Criar o diretório de saída
+      - name: Create output directory
+        run: mkdir -p out
+
+      # Baixar e configurar JavaFX SDK com cache
+      - name: Cache JavaFX SDK
+        uses: actions/cache@v3
+        with:
+          path: $HOME/javafx
+          key: javafx-sdk-17
+
+      - name: Download and setup JavaFX SDK
+        run: |
+          if [ ! -d "$HOME/javafx" ]; then
+            wget https://download2.gluonhq.com/openjfx/17/openjfx-17_linux-x64_bin-sdk.zip
+            unzip openjfx-17_linux-x64_bin-sdk.zip
+            mv javafx-sdk-17 $HOME/javafx
+            rm openjfx-17_linux-x64_bin-sdk.zip
+          fi
+
+      # Garantir permissões corretas
+      - name: Grant execute permissions
+        run: chmod +x $HOME/javafx/lib/*
+
+      # Compilar código Java com JavaFX
+      - name: Compile Java code
+        run: |
+          echo "Verificando se arquivos .java existem..."
+          find src/main/java -name "*.java" || exit 1
+          echo "Compilando código Java..."
+          find src/main/java -name "*.java" -print0 | xargs -0 javac --module-path $HOME/javafx/lib --add-modules javafx.controls,javafx.fxml -d out || exit 1
+
+      # Listar arquivos compilados para depuração
+      - name: List compiled files
+        run: ls -R out
+
+      # Executar o programa Java
+      - name: Run Java program
+        run: |
+          java --module-path $HOME/javafx/lib --add-modules javafx.controls,javafx.fxml -cp out br.com.sudoku.Main
